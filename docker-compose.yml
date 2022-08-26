@@ -1,0 +1,42 @@
+version: '3.3'
+services:
+  server:
+    build:
+      context: ./
+      dockerfile: ./server/Dockerfile
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./server:/server
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      DEBUG: 'True'
+      DATABASE_URL: 'postgres://postgres:postgres@db:5432/postgres'
+
+  db:
+    image: postgres:12.4-alpine
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+  celery:
+    build:
+      context: ./
+      dockerfile: ./server/Dockerfile
+    command: celery --app config.settings.celery worker -l INFO
+    volumes:
+      - ./server:/usr/src/app
+    environment:
+      DEBUG: 'True'
+      CELERY_BROKER: 'redis://redis:6379/0'
+      CELERY_BACKEND: 'redis://redis:6379/0'
+    depends_on:
+      - redis
+      - db
+      - server
+
+  redis:
+    image: redis:5-alpine

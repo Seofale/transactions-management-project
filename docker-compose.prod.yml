@@ -1,0 +1,53 @@
+version: '3.3'
+
+services:
+  nginx:
+    restart: always
+    build:
+      context: ./
+      dockerfile: ./nginx/Dockerfile
+    depends_on:
+      - server
+    ports:
+      - 1337:80
+
+  server:
+    restart: always
+    build:
+      context: ./
+      dockerfile: ./server/Dockerfile
+    command: gunicorn config.wsgi -c ./config/gunicorn.py
+    depends_on:
+      - db
+    environment:
+      DEBUG: 'False'
+      DATABASE_URL: 'postgres://postgres:postgres@db:5432/postgres'
+
+  db:
+    restart: always
+    image: postgres:12.4-alpine
+    volumes:
+      - ./pg_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+  celery:
+    build:
+      context: ./
+      dockerfile: ./server/Dockerfile
+    command: celery --app config.settings.celery worker -l INFO
+    volumes:
+      - ./server:/usr/src/app
+    environment:
+      DEBUG: 'True'
+      CELERY_BROKER: 'redis://redis:6379/0'
+      CELERY_BACKEND: 'redis://redis:6379/0'
+    depends_on:
+      - redis
+      - db
+      - server
+
+  redis:
+    image: redis:5-alpine
